@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -25,58 +24,12 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger/OpenAPI documentation
-  const config = new DocumentBuilder()
-    .setTitle('Studio Management API')
-    .setDescription(
-      'SaaS API for Yoga Studios to expose class data and booking functionality to cooperators (third-party partners). ' +
-      'This API allows cooperators to access venue information, view live class inventory, and manage reservations on behalf of their users.'
-    )
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'API Key',
-        description: 'Enter your API key',
-      },
-      'API Key',
-    )
-    .addApiKey(
-      {
-        type: 'apiKey',
-        name: 'X-API-Key',
-        in: 'header',
-        description: 'API Key for authentication',
-      },
-      'X-API-Key',
-    )
-    .addTag('venues', 'Venue information endpoints')
-    .addTag('classes', 'Class inventory and availability endpoints')
-    .addTag('reservations', 'Reservation management endpoints')
-    .addServer('http://localhost:3000', 'Local development server')
-    .addServer('https://api.studio-management.com', 'Production server')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    customSiteTitle: 'Studio Management API Documentation',
-    customCss: '.swagger-ui .topbar { display: none }',
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-      filter: true,
-      showRequestDuration: true,
-    },
-  });
-
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
   console.log('');
   console.log('='.repeat(60));
   console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`API Documentation: http://localhost:${port}/api/docs`);
   console.log('='.repeat(60));
   console.log('');
 }
