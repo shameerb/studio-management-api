@@ -1,0 +1,81 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: studio-management-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: studio_management
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - studio-network
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-prootpassword']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: studio-management-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - studio-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: studio-management-api
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: mysql://user:password@mysql:3306/studio_management
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TTL: 300
+      PORT: 3000
+      THROTTLE_TTL: 60
+      THROTTLE_LIMIT: 100
+      CACHE_TTL: 300
+      JWT_SECRET: ${JWT_SECRET:-d8f9a7e2c1b4567890abcdef1234567890abcdef1234567890abcdef12345678}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-1h}
+      JWT_ISSUER: ${JWT_ISSUER:-studio-management-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cooperators}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - studio-network
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - /app/node_modules
+
+networks:
+  studio-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

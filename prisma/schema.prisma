@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Cooperator - third-party companies that want to access venue data
+model Cooperator {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  apiKeys          ApiKey[]
+  venueCooperators VenueCooperator[]
+  reservations     Reservation[]
+
+  @@index([email])
+  @@index([isActive])
+  @@map("cooperators")
+}
+
+// ApiKey - authentication credentials for cooperators
+model ApiKey {
+  id           String    @id @default(uuid())
+  cooperatorId String
+  keyHash      String    @unique // Hashed API key for security
+  name         String
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  cooperator Cooperator @relation(fields: [cooperatorId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([cooperatorId])
+  @@index([isActive])
+  @@map("api_keys")
+}
+
+// Venue - yoga studios that offer classes
+model Venue {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String   @default("US")
+  description String?  @db.Text
+  website     String?
+  isActive    Boolean  @default(true)
+  apiEnabled  Boolean  @default(false) // Whether API access is enabled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relations
+  classes          Class[]
+  venueCooperators VenueCooperator[]
+
+  @@index([email])
+  @@index([isActive])
+  @@index([apiEnabled])
+  @@map("venues")
+}
+
+// VenueCooperator - junction table controlling which cooperators can access which venues
+model VenueCooperator {
+  id           String   @id @default(uuid())
+  venueId      String
+  cooperatorId String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  cooperator Cooperator @relation(fields: [cooperatorId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, cooperatorId])
+  @@index([venueId])
+  @@index([cooperatorId])
+  @@index([isActive])
+  @@map("venue_cooperators")
+}
+
+// Class - yoga classes offered by venues
+model Class {
+  id               String   @id @default(uuid())
+  venueId          String
+  name             String
+  description      String?  @db.Text
+  instructorName   String?
+  startTime        DateTime
+  endTime          DateTime
+  spotsTotal       Int
+  spotsAvailable   Int
+  price            Decimal  @db.Decimal(10, 2)
+  isActive         Boolean  @default(true)
+  isCancelled      Boolean  @default(false)
+  requiresBooking  Boolean  @default(true)
+  difficultyLevel  String? // Beginner, Intermediate, Advanced
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  venue        Venue         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([venueId])
+  @@index([startTime])
+  @@index([isActive])
+  @@index([isCancelled])
+  @@index([venueId, startTime]) // Composite index for common query pattern
+  @@map("classes")
+}
+
+// Reservation - Bookings made by cooperator users
+model Reservation {
+  id                String    @id @default(uuid())
+  classId           String
+  cooperatorId      String
+  cooperatorUserId  String // The cooperator's user ID (external reference)
+  idempotencyKey    String    @unique // To prevent duplicate bookings
+  status            String    @default("confirmed") // confirmed, cancelled, no_show
+  userEmail         String? // Optional: cooperator user's email
+  userName          String? // Optional: cooperator user's name
+  cancelledAt       DateTime?
+  cancellationNote  String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  class      Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  cooperator Cooperator @relation(fields: [cooperatorId], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+  @@index([cooperatorId])
+  @@index([cooperatorUserId])
+  @@index([idempotencyKey])
+  @@index([status])
+  @@index([classId, status]) // Composite index for counting active reservations
+  @@map("reservations")
+}
